@@ -1,123 +1,165 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useApp } from '../../context/AppContext';
-import { LogIn, Loader2, Pill } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '../../context/AuthContext';
+import { Pill, Key, Mail, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }) {
   const router = useRouter();
-  const { user, loginUser, loading, showToast } = useApp();
+
+  // Resolve searchParams using React.use() in Next.js 15+
+  const resolvedSearchParams = searchParams ? use(searchParams) : {};
+  const redirect = resolvedSearchParams?.redirect || '/products';
+  const isSessionExpired = resolvedSearchParams?.expired === 'true';
+
+  const { login, isAuthenticated, loading: authLoading } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // If already logged in, redirect to home
+  // Redirect if already authenticated
   useEffect(() => {
-    if (user) {
-      router.push('/');
+    if (isAuthenticated && !authLoading) {
+      router.push(redirect);
     }
-  }, [user, router]);
+  }, [isAuthenticated, authLoading, redirect, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) {
-      showToast('Please enter both email and password.', 'error');
-      return;
-    }
+    if (!email || !password) return;
 
+    setError('');
+    setLoading(true);
     try {
-      await loginUser(email, password);
-      router.push('/');
+      await login(email, password);
+      router.push(redirect);
     } catch (err) {
-      // toast is already displayed inside loginUser
+      console.error(err);
+      setError(err.message || 'Invalid email or password. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (user) return null;
-
   return (
-    <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center text-emerald-600">
-          <Pill className="h-10 w-10 stroke-[2.5]" />
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-zinc-900">
-          Sign In to your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-zinc-500">
-          Access your personalized healthcare storefront
-        </p>
-      </div>
+    <div className="flex-1 flex items-center justify-center py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-radial-[circle_at_top] from-violet-950/20 via-transparent to-transparent">
+      {/* Light highlights */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-violet-600/10 blur-[100px] pointer-events-none"></div>
 
-      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="rounded-2xl border border-zinc-200 bg-white px-6 py-8 shadow-sm sm:px-10">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-xs font-bold text-zinc-450 uppercase tracking-wide">
+      <div className="w-full max-w-md space-y-8 relative z-10 animate-slide-up">
+        {/* Logo and Headings */}
+        <div className="text-center space-y-3">
+          <Link href="/" className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/20 mb-2">
+            <Pill className="h-6 w-6" />
+          </Link>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight">Welcome Back</h2>
+          <p className="text-xs text-zinc-400">
+            Sign in to manage your medical equipment shopping basket.
+          </p>
+        </div>
+
+        {/* Form panel container */}
+        <div className="border border-zinc-900 bg-zinc-950/40 p-8 rounded-2xl space-y-6">
+
+          {isSessionExpired && (
+            <div className="text-xs text-amber-400 bg-amber-500/5 border border-amber-500/15 p-3 rounded-lg text-center">
+              Your session has expired. Please sign in again.
+            </div>
+          )}
+
+          {error && (
+            <div className="text-xs text-red-400 bg-red-500/5 border border-red-500/15 p-3 rounded-lg text-center">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5" />
                 Email Address
               </label>
-              <div className="mt-1.5">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+              <input
+                type="email"
+                required
+                placeholder="doctor@hospital.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-805 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
             </div>
 
-            <div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-xs font-bold text-zinc-450 uppercase tracking-wide">
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                  <Key className="h-3.5 w-3.5" />
                   Password
                 </label>
               </div>
-              <div className="mt-1.5">
+              <div className="relative">
                 <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-zinc-900 border border-zinc-805 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
-            <div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-3 text-sm font-bold text-white shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <LogIn className="h-5 w-5" />
-                )}
-                <span>Sign In</span>
-              </button>
-            </div>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-violet-600/15 disabled:opacity-50 btn-glow mt-6"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </button>
           </form>
 
-          <p className="mt-8 text-center text-xs font-medium text-zinc-500">
-            New to MedStore?{' '}
+          {/* Prompt redirecting registration */}
+          <div className="text-center pt-2 text-xs">
+            <span className="text-zinc-500">New to MedKart? </span>
             <Link
-              href="/signup"
-              className="font-bold text-emerald-600 hover:text-emerald-500 transition-colors"
+              href={`/signup?redirect=${encodeURIComponent(redirect)}`}
+              className="text-violet-400 hover:underline font-semibold"
             >
               Create an account
             </Link>
-          </p>
+          </div>
+        </div>
+
+        {/* Back Link */}
+        <div className="text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-wider"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Home
+          </Link>
         </div>
       </div>
     </div>

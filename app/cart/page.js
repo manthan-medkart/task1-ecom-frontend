@@ -1,227 +1,259 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useApp } from '../../context/AppContext';
-import { Trash2, ShoppingBag, Plus, Minus, ArrowRight, ShieldCheck, RefreshCw } from 'lucide-react';
+import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
+import { api } from '../../services/api';
+import CartItem from '../../components/CartItem';
+import { ShoppingBag, ArrowRight, ShieldCheck, MapPin, CreditCard, Gift, Loader2 } from 'lucide-react';
 
 export default function CartPage() {
   const router = useRouter();
-  const { token, cart, updateItemQty, removeItem, clearCartItems, loading } = useApp();
+  const { user, isAuthenticated } = useAuth();
+  const { cartItems, cartTotal, clearCart } = useCart();
 
-  const cartItems = cart?.items || [];
-  const totalPrice = cart?.totalPrice || 0;
+  // Checkout form states
+  const [shippingAddress, setShippingAddress] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Credit Card');
+  const [orderPlacing, setOrderPlacing] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(null);
+  const [error, setError] = useState('');
 
-  // Shipping logic: free shipping above ₹300, else ₹50
-  const shippingCost = totalPrice >= 300 || totalPrice === 0 ? 0 : 50;
-  const grandTotal = totalPrice + shippingCost;
+  const shippingCost = cartTotal > 150 ? 0 : 9.99;
+  const taxCost = parseFloat((cartTotal * 0.08).toFixed(2)); // 8% standard healthcare hardware tax
+  const grandTotal = parseFloat((cartTotal + shippingCost + taxCost).toFixed(2));
 
-  const handleQtyChange = async (productId, currentQty, amount) => {
-    const nextQty = currentQty + amount;
-    if (nextQty <= 0) {
-      await removeItem(productId);
-    } else {
-      await updateItemQty(productId, nextQty);
+  const handlePlaceOrder = async (e) => {
+    e.preventDefault();
+    if (cartItems.length === 0) return;
+    setError('');
+
+    // Ensure authentication first
+    if (!isAuthenticated) {
+      router.push('/login?redirect=/cart');
+      return;
+    }
+
+    if (!shippingAddress.trim()) {
+      setError('Please provide a valid shipping address for clinical supplies.');
+      return;
+    }
+
+    setOrderPlacing(true);
+    try {
+      // Calls api.placeOrder which handles clearing active cart
+      const newOrder = await api.placeOrder(shippingAddress, paymentMethod);
+      setOrderSuccess(newOrder);
+      // Synchronize client-side basket
+      await clearCart();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to place your order. Please try again.');
+    } finally {
+      setOrderPlacing(false);
     }
   };
 
-  if (!token) {
+  // 1. Success Screen State
+  if (orderSuccess) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-zinc-150 mb-6">
-          <ShoppingBag className="h-8 w-8 text-zinc-400" />
+      <div className="mx-auto max-w-xl px-4 py-24 text-center space-y-8 animate-slide-up">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-400 mx-auto border border-emerald-500/20">
+          <ShieldCheck className="h-8 w-8 animate-pulse-slow" />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Please Sign In</h2>
-        <p className="mt-2 text-sm text-zinc-500 max-w-sm mx-auto">
-          You need to sign in to access your personal shopping cart and place orders.
-        </p>
-        <div className="mt-6 flex justify-center gap-4">
+
+        <div className="space-y-2">
+          <h1 className="text-3xl font-extrabold text-white">Order Confirmed!</h1>
+          <p className="text-sm text-zinc-400">
+            Thank you for shopping at MedKart. Your order has been registered under:
+          </p>
+          <p className="text-sm font-bold text-violet-400 uppercase tracking-wider">
+            {orderSuccess.id}
+          </p>
+        </div>
+
+        <div className="border border-zinc-900 bg-zinc-950/40 p-6 rounded-2xl text-left space-y-4 text-xs">
+          <div className="flex justify-between pb-3 border-b border-zinc-900">
+            <span className="text-zinc-500 font-medium">Status</span>
+            <span className="text-emerald-400 font-bold">Processing</span>
+          </div>
+          <div className="flex justify-between pb-3 border-b border-zinc-900">
+            <span className="text-zinc-500 font-medium">Delivery Address</span>
+            <span className="text-zinc-300 font-semibold text-right max-w-[200px] truncate">{orderSuccess.shippingAddress}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500 font-medium">Total Paid</span>
+            <span className="text-white font-extrabold text-sm">${orderSuccess.totalPrice.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 pt-4">
           <Link
-            href="/login"
-            className="rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-emerald-500 transition-all"
+            href="/orders"
+            className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-md shadow-violet-600/10"
           >
-            Sign In Now
+            Track Order
           </Link>
           <Link
-            href="/"
-            className="rounded-xl border border-zinc-200 px-6 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-all"
+            href="/products"
+            className="w-full border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white font-semibold py-3 px-6 rounded-xl transition-all"
           >
-            Browse Medicines
+            Continue Shopping
           </Link>
         </div>
       </div>
     );
   }
 
+  // 2. Empty State
   if (cartItems.length === 0) {
     return (
-      <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6 lg:px-8 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 mb-6">
-          <ShoppingBag className="h-8 w-8 text-emerald-600" />
+      <div className="mx-auto max-w-md px-4 py-24 text-center space-y-6">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 text-zinc-500 mx-auto">
+          <ShoppingBag className="h-8 w-8" />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-zinc-900">Your Cart is Empty</h2>
-        <p className="mt-2 text-sm text-zinc-500 max-w-sm mx-auto">
-          It looks like you haven't added any medicines yet. Let's find some health products!
-        </p>
-        <div className="mt-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-emerald-500 transition-all"
-          >
-            <span>Start Shopping</span>
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold text-white">Your Cart is Empty</h2>
+          <p className="text-sm text-zinc-500">{"Looks like you haven't added any products to your cart yet."}</p>
         </div>
+        <Link
+          href="/products"
+          className="inline-flex items-center gap-2 text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700 px-6 py-3 rounded-xl transition-colors shadow-lg shadow-violet-600/15 btn-glow"
+        >
+          Explore Catalogue
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
     );
   }
 
+  // 3. Cart list and Checkout controls
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 mb-8">
-        Shopping Cart
-      </h1>
+    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 space-y-8">
+      {/* Title */}
+      <div className="space-y-1">
+        <h1 className="text-3xl font-extrabold text-white tracking-tight">Shopping Cart</h1>
+        <p className="text-sm text-zinc-400">Review your clinical gear and complete the checkout order.</p>
+      </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        {/* Cart Items List */}
-        <div className="lg:col-span-8 space-y-4">
-          <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
-            <span className="text-sm font-semibold text-zinc-500">{cartItems.length} items in cart</span>
-            <button
-              onClick={clearCartItems}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span>Clear Cart</span>
-            </button>
-          </div>
-
-          <div className="divide-y divide-zinc-200">
-            {cartItems.map((item) => {
-              const product = item.product;
-              if (!product) return null;
-
-              const itemPrice = item.price || product.salesRate;
-
-              return (
-                <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between py-6 gap-4">
-                  {/* Product Info */}
-                  <div className="flex items-center gap-4">
-                    <div className="relative h-16 w-24 overflow-hidden rounded-xl border border-zinc-150 bg-zinc-50 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={product.imageUrl || 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=500&auto=format&fit=crop&q=60'}
-                        alt={product.name}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <Link href={`/products/${product.id}`} className="font-bold text-zinc-900 hover:text-emerald-500 transition-colors">
-                        {product.name}
-                      </Link>
-                      <p className="text-xs text-zinc-400 font-medium">{product.composition}</p>
-                      <p className="mt-1 text-xs font-semibold text-emerald-600 sm:hidden">
-                        ₹{itemPrice} each
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Actions & Price */}
-                  <div className="flex items-center justify-between sm:justify-end gap-8 w-full sm:w-auto">
-                    {/* Price each (Desktop) */}
-                    <div className="hidden sm:block text-right">
-                      <p className="text-xs text-zinc-400">Unit Price</p>
-                      <p className="text-sm font-semibold text-zinc-700">₹{itemPrice}</p>
-                    </div>
-
-                    {/* Quantity Selector */}
-                    <div className="flex items-center rounded-xl border border-zinc-200 bg-white">
-                      <button
-                        onClick={() => handleQtyChange(product.id, item.quantity, -1)}
-                        className="flex h-8 w-8 items-center justify-center font-bold text-zinc-500 hover:text-zinc-950 cursor-pointer"
-                      >
-                        <Minus className="h-3.5 w-3.5" />
-                      </button>
-                      <span className="w-8 text-center text-xs font-bold text-zinc-850">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => handleQtyChange(product.id, item.quantity, 1)}
-                        className="flex h-8 w-8 items-center justify-center font-bold text-zinc-500 hover:text-zinc-950 cursor-pointer"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Subtotal */}
-                    <div className="text-right min-w-[70px]">
-                      <p className="text-xs text-zinc-400 sm:hidden">Total</p>
-                      <p className="text-sm font-extrabold text-zinc-900">
-                        ₹{itemPrice * item.quantity}
-                      </p>
-                    </div>
-
-                    {/* Delete Item */}
-                    <button
-                      onClick={() => removeItem(product.id)}
-                      className="text-zinc-400 hover:text-rose-500 transition-colors p-1.5 cursor-pointer"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* Left Column: Items List */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="space-y-3">
+            {cartItems.map((item) => (
+              <CartItem key={item.product.id} item={item} />
+            ))}
           </div>
         </div>
 
-        {/* Cart Summary */}
-        <div className="lg:col-span-4">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-zinc-900 mb-6">Order Summary</h2>
-            
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between text-zinc-650">
-                <span>Subtotal</span>
-                <span className="font-semibold text-zinc-900">₹{totalPrice}</span>
-              </div>
-              <div className="flex justify-between text-zinc-650">
-                <span>Delivery Charge</span>
-                {shippingCost === 0 ? (
-                  <span className="font-semibold text-emerald-600">FREE</span>
-                ) : (
-                  <span className="font-semibold text-zinc-900">₹{shippingCost}</span>
-                )}
-              </div>
-              {shippingCost > 0 && (
-                <p className="text-[10px] text-zinc-400 italic">
-                  * Add ₹{300 - totalPrice} more for free delivery
-                </p>
-              )}
-              
-              <hr className="border-zinc-200" />
-              
-              <div className="flex justify-between text-base font-extrabold text-zinc-900">
-                <span>Grand Total</span>
-                <span>₹{grandTotal}</span>
+        {/* Right Column: Checkout forms & Invoice pricing */}
+        <div className="space-y-6">
+
+          {/* Checkout Credentials */}
+          <form onSubmit={handlePlaceOrder} className="border border-zinc-900 bg-zinc-950/20 p-6 rounded-2xl space-y-5">
+            <h3 className="text-base font-bold text-white">Order Details</h3>
+
+            {/* Delivery address input */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <MapPin className="h-3.5 w-3.5" />
+                Shipping Address
+              </label>
+              <textarea
+                required
+                rows={2}
+                placeholder="Enter complete shipping details..."
+                value={shippingAddress}
+                onChange={(e) => setShippingAddress(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-805 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
+            </div>
+
+            {/* Payment Method Select */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <CreditCard className="h-3.5 w-3.5" />
+                Payment Method
+              </label>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                {['Credit Card', 'Cash on Delivery'].map((method) => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => setPaymentMethod(method)}
+                    className={`py-2 px-3 border rounded-xl font-medium transition-all ${paymentMethod === method
+                        ? 'bg-violet-600/10 text-violet-400 border-violet-600'
+                        : 'bg-zinc-900 border-zinc-805 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                  >
+                    {method}
+                  </button>
+                ))}
               </div>
             </div>
 
+            {/* Pricing Details Breakdown */}
+            <div className="border-t border-zinc-900 pt-4 space-y-2 text-xs">
+              <div className="flex justify-between text-zinc-400">
+                <span>Subtotal</span>
+                <span>${cartTotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-zinc-400">
+                <span>Shipping</span>
+                <span>{shippingCost === 0 ? 'Free' : `$${shippingCost.toFixed(2)}`}</span>
+              </div>
+              <div className="flex justify-between text-zinc-400">
+                <span>Tax (8%)</span>
+                <span>${taxCost.toFixed(2)}</span>
+              </div>
+              {cartTotal > 150 && (
+                <div className="flex justify-between text-emerald-400 font-semibold bg-emerald-500/5 px-2 py-1 rounded border border-emerald-500/10">
+                  <span className="flex items-center gap-1">
+                    <Gift className="h-3.5 w-3.5" />
+                    Free shipping applied!
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-extrabold text-white border-t border-zinc-900 pt-3">
+                <span>Total Cost</span>
+                <span>${grandTotal.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Error logs */}
+            {error && (
+              <p className="text-xs text-red-400 bg-red-500/5 border border-red-500/15 p-2.5 rounded-lg">
+                {error}
+              </p>
+            )}
+
+            {/* Place Order CTA Button */}
             <button
-              onClick={() => router.push('/checkout')}
-              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-3.5 text-sm font-bold text-white shadow-md transition-all cursor-pointer"
+              type="submit"
+              disabled={orderPlacing}
+              className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-violet-600/15 disabled:opacity-50 btn-glow"
             >
-              <span>Secure Checkout</span>
-              <ArrowRight className="h-4 w-4" />
+              {orderPlacing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Placing Order...
+                </>
+              ) : (
+                <>
+                  Place Order
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
 
-            {/* Verification highlights */}
-            <div className="mt-6 flex items-center gap-2.5 text-xs text-zinc-500">
-              <ShieldCheck className="h-5 w-5 text-emerald-500 shrink-0" />
-              <span>Safe payments & genuine medical supply guaranteed.</span>
-            </div>
-          </div>
+            {!isAuthenticated && (
+              <p className="text-[10px] text-zinc-500 text-center">
+                * Placing order will prompt you to login or register your credentials.
+              </p>
+            )}
+          </form>
         </div>
       </div>
     </div>

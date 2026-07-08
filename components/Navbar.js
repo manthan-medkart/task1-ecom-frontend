@@ -1,112 +1,206 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useApp } from '../context/AppContext';
-import { ShoppingCart, ClipboardList, LogIn, UserPlus, LogOut, User, Pill } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import { ShoppingCart, User, LogOut, Package, Menu, X, Pill } from 'lucide-react';
 
 export default function Navbar() {
-  const { user, logoutUser, cartCount } = useApp();
+  const { user, logout, isAuthenticated } = useAuth();
+  const { cartCount } = useCart();
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const isActive = (path) => pathname === path;
 
+  const handleLogout = async () => {
+    await logout();
+    setDropdownOpen(false);
+  };
+
   return (
-    <nav className="sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/80 backdrop-blur-md transition-colors">
+    <header className="sticky top-0 z-50 w-full glass shadow-sm transition-all duration-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-emerald-600 hover:opacity-90">
-              <Pill className="h-6 w-6 stroke-[2.5]" />
-              <span>MedStore</span>
+          <div className="flex items-center">
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-lg shadow-violet-500/20 group-hover:scale-105 transition-transform duration-300">
+                <Pill className="h-5 w-5 animate-pulse-slow" />
+              </div>
+              <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-violet-500 to-fuchsia-500 bg-clip-text text-transparent">
+                MedKart
+              </span>
             </Link>
           </div>
 
-          {/* Nav Items */}
-          <div className="flex items-center gap-1 sm:gap-4">
+          {/* Desktop Nav Links */}
+          <nav className="hidden md:flex items-center gap-8">
             <Link
-              href="/"
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive('/')
-                  ? 'bg-zinc-100 text-zinc-900'
-                  : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
-              }`}
+              href="/products"
+              className={`text-sm font-medium transition-colors hover:text-violet-400 ${isActive('/products') ? 'text-violet-500' : 'text-zinc-400'
+                }`}
             >
-              Shop
+              Products
             </Link>
-
-            {user && (
+            {isAuthenticated && (
               <Link
                 href="/orders"
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive('/orders')
-                    ? 'bg-zinc-100 text-zinc-900'
-                    : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
-                }`}
+                className={`text-sm font-medium transition-colors hover:text-violet-400 ${isActive('/orders') ? 'text-violet-500' : 'text-zinc-400'
+                  }`}
               >
-                <ClipboardList className="h-4 w-4" />
-                <span className="hidden sm:inline">Orders</span>
+                My Orders
               </Link>
             )}
+          </nav>
 
-            {/* Cart with Count badge */}
-            <Link
-              href="/cart"
-              className={`relative flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                isActive('/cart')
-                  ? 'bg-zinc-100 text-zinc-900'
-                  : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
-              }`}
-            >
-              <ShoppingCart className="h-4 w-4" />
-              <span className="hidden sm:inline">Cart</span>
+          {/* Action Icons */}
+          <div className="hidden md:flex items-center gap-4">
+            {/* Cart Button */}
+            <Link href="/cart" className="relative p-2 text-zinc-400 hover:text-violet-500 transition-colors group">
+              <ShoppingCart className="h-6 w-6 group-hover:scale-105 transition-transform" />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white ring-2 ring-white animate-pulse">
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white ring-2 ring-black animate-fade-in">
                   {cartCount}
                 </span>
               )}
             </Link>
 
-            <span className="h-6 w-px bg-zinc-200 mx-2" />
-
-            {/* User Session Info */}
-            {user ? (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="hidden lg:flex items-center gap-1.5 text-sm text-zinc-700">
-                  <User className="h-4 w-4 text-zinc-400" />
-                  <span className="font-medium max-w-[120px] truncate">{user.name}</span>
-                </div>
+            {/* Auth Button */}
+            {isAuthenticated ? (
+              <div className="relative">
                 <button
-                  onClick={logoutUser}
-                  className="flex items-center gap-1.5 rounded-lg border border-zinc-200 hover:border-zinc-300 bg-transparent px-3 py-1.5 text-xs font-semibold text-zinc-700 transition-all hover:bg-zinc-50 cursor-pointer"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                  className="flex items-center gap-2 p-1 rounded-full border border-zinc-800 hover:border-violet-500/50 hover:bg-zinc-900/50 transition-all duration-300"
                 >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span>Logout</span>
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600/10 text-violet-400 font-bold text-sm">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium text-zinc-300 pr-2 max-w-[120px] truncate">
+                    {user.name}
+                  </span>
                 </button>
+
+                {/* Dropdown Menu */}
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-xl border border-zinc-800 bg-zinc-950 p-2 shadow-xl ring-1 ring-black ring-opacity-5 animate-slide-up">
+                    <div className="px-3 py-2 text-xs border-b border-zinc-900 text-zinc-500 truncate mb-1">
+                      {user.email}
+                    </div>
+                    <Link
+                      href="/orders"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 rounded-lg hover:bg-zinc-900 transition-colors"
+                    >
+                      <Package className="h-4 w-4" />
+                      Orders History
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 rounded-lg hover:bg-red-500/10 transition-colors text-left"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign Out
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="flex items-center gap-1 sm:gap-2">
+              <div className="flex items-center gap-3">
                 <Link
                   href="/login"
-                  className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 transition-colors"
+                  className="text-sm font-medium text-zinc-300 hover:text-white transition-colors px-3 py-1.5 rounded-lg"
                 >
-                  <LogIn className="h-4 w-4" />
-                  <span className="hidden xs:inline">Sign In</span>
+                  Sign In
                 </Link>
                 <Link
                   href="/signup"
-                  className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-sm font-semibold text-white transition-all shadow-sm shadow-emerald-500/10 hover:shadow-emerald-500/20"
+                  className="btn-glow text-sm font-medium bg-violet-600 text-white hover:bg-violet-700 transition-colors px-4 py-2 rounded-lg shadow-lg shadow-violet-600/20"
                 >
-                  <UserPlus className="h-4 w-4" />
-                  <span>Sign Up</span>
+                  Sign Up
                 </Link>
               </div>
             )}
           </div>
+
+          {/* Mobile Menu Button */}
+          <div className="flex md:hidden items-center gap-4">
+            <Link href="/cart" className="relative p-2 text-zinc-400 hover:text-violet-500 transition-colors">
+              <ShoppingCart className="h-6 w-6" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white ring-2 ring-black">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
+
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 text-zinc-400 hover:text-white"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
       </div>
-    </nav>
+
+      {/* Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden border-t border-zinc-900 bg-zinc-950/95 backdrop-blur-md px-4 py-4 space-y-3 animate-slide-up">
+          <Link
+            href="/products"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block text-base font-medium text-zinc-300 py-2"
+          >
+            Products
+          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                href="/orders"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-base font-medium text-zinc-300 py-2"
+              >
+                My Orders
+              </Link>
+              <div className="border-t border-zinc-900 pt-3">
+                <div className="text-sm font-semibold text-zinc-400 mb-1">{user.name}</div>
+                <div className="text-xs text-zinc-500 mb-3">{user.email}</div>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full flex items-center gap-2 text-base font-medium text-red-400 py-2"
+                >
+                  <LogOut className="h-5 w-5" />
+                  Sign Out
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 border-t border-zinc-900 pt-4">
+              <Link
+                href="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center text-sm font-medium border border-zinc-800 text-zinc-300 py-2 rounded-lg"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/signup"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center justify-center text-sm font-medium bg-violet-600 text-white py-2 rounded-lg"
+              >
+                Sign Up
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+    </header>
   );
 }

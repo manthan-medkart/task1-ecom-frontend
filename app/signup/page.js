@@ -1,177 +1,204 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useApp } from '../../context/AppContext';
-import { UserPlus, Loader2, Pill, Check, X } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Pill, User, Mail, Key, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
 
-export default function SignupPage() {
+export default function SignupPage({ searchParams }) {
   const router = useRouter();
-  const { user, signupUser, loading, showToast } = useApp();
+
+  // Resolve searchParams using React.use() in Next.js 15+
+  const resolvedSearchParams = searchParams ? use(searchParams) : {};
+  const redirect = resolvedSearchParams?.redirect || '/products';
+
+  const { signup, isAuthenticated, loading: authLoading } = useAuth();
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Password validation checks (matching Spring Boot regex constraints)
-  const isMinLength = password.length >= 8;
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasLowercase = /[a-z]/.test(password);
-  const hasSpecialChar = /[@#$%^&+=]/.test(password);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // If already logged in, redirect to home
+  // Redirect if already logged in
   useEffect(() => {
-    if (user) {
-      router.push('/');
+    if (isAuthenticated && !authLoading) {
+      router.push(redirect);
     }
-  }, [user, router]);
+  }, [isAuthenticated, authLoading, redirect, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !password) {
-      showToast('Please fill in all the required fields.', 'error');
+    setError('');
+
+    // Field Validations
+    if (!name.trim()) {
+      setError('Please provide a username.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must contain at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please verify.');
       return;
     }
 
-    // Verify constraints before submitting to avoid unnecessary API errors
-    if (!isMinLength || !hasUppercase || !hasLowercase || !hasSpecialChar) {
-      showToast('Please ensure password satisfies all constraints.', 'error');
-      return;
-    }
-
+    setLoading(true);
     try {
-      await signupUser(name.trim(), email.trim(), password);
-      router.push('/');
+      await signup(name, email, password);
+      router.push(redirect);
     } catch (err) {
-      // toast is already displayed inside signupUser
+      console.error(err);
+      setError(err.message || 'Registration failed. Email might already be taken.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (user) return null;
-
   return (
-    <div className="flex flex-1 flex-col justify-center px-6 py-12 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center text-emerald-600">
-          <Pill className="h-10 w-10 stroke-[2.5]" />
-        </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-zinc-900">
-          Create your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-zinc-500">
-          Start ordering medicines in just a few clicks
-        </p>
-      </div>
+    <div className="flex-1 flex items-center justify-center py-16 px-4 sm:px-6 lg:px-8 relative overflow-hidden bg-radial-[circle_at_top] from-violet-950/20 via-transparent to-transparent">
+      {/* Light highlights */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-violet-600/10 blur-[100px] pointer-events-none"></div>
 
-      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="rounded-2xl border border-zinc-200 bg-white px-6 py-8 shadow-sm sm:px-10">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="name" className="block text-xs font-bold text-zinc-450 uppercase tracking-wide">
+      <div className="w-full max-w-md space-y-8 relative z-10 animate-slide-up">
+        {/* Logo and Headings */}
+        <div className="text-center space-y-3">
+          <Link href="/" className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/20 mb-2">
+            <Pill className="h-6 w-6" />
+          </Link>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight">Create Account</h2>
+          <p className="text-xs text-zinc-400">
+            Sign up to order diagnostic supplies and oximeters.
+          </p>
+        </div>
+
+        {/* Form container */}
+        <div className="border border-zinc-900 bg-zinc-950/40 p-8 rounded-2xl space-y-6">
+
+          {error && (
+            <div className="text-xs text-red-400 bg-red-500/5 border border-red-500/15 p-3 rounded-lg text-center animate-fade-in">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <User className="h-3.5 w-3.5" />
                 Full Name
               </label>
-              <div className="mt-1.5">
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  required
-                  placeholder="John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+              <input
+                type="text"
+                required
+                placeholder="Dr. John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-805 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
             </div>
 
-            <div>
-              <label htmlFor="email" className="block text-xs font-bold text-zinc-450 uppercase tracking-wide">
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <Mail className="h-3.5 w-3.5" />
                 Email Address
               </label>
-              <div className="mt-1.5">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  required
-                  placeholder="john@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+              <input
+                type="email"
+                required
+                placeholder="doctor@hospital.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-805 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-xs font-bold text-zinc-450 uppercase tracking-wide">
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <Key className="h-3.5 w-3.5" />
                 Password
               </label>
-              <div className="mt-1.5">
+              <div className="relative">
                 <input
-                  id="password"
-                  name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="••••••••"
+                  placeholder="At least 6 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  className="w-full bg-zinc-900 border border-zinc-805 rounded-xl pl-4 pr-10 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
+            </div>
 
-              {/* Password Requirement checklist indicators */}
-              {password.length > 0 && (
-                <div className="mt-3 space-y-1.5 rounded-xl bg-zinc-50 p-3 border border-zinc-100">
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1.5">Password Requirements</p>
-                  
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-650">
-                    {isMinLength ? <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <X className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
-                    <span>Minimum 8 characters</span>
-                  </div>
+            {/* Confirm Password Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1">
+                <Key className="h-3.5 w-3.5" />
+                Confirm Password
+              </label>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                placeholder="Re-enter password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-805 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500/50 transition-colors"
+              />
+            </div>
 
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-650">
-                    {hasUppercase ? <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <X className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
-                    <span>At least one Uppercase letter</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-650">
-                    {hasLowercase ? <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <X className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
-                    <span>At least one Lowercase letter</span>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-650">
-                    {hasSpecialChar ? <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <X className="h-3.5 w-3.5 text-zinc-400 shrink-0" />}
-                    <span>At least one Special character from (@, #, $, %, ^, &amp;, +, =)</span>
-                  </div>
-                </div>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold py-3 rounded-xl transition-all shadow-lg shadow-violet-600/15 disabled:opacity-50 btn-glow mt-6"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating Account...
+                </>
+              ) : (
+                'Create Account'
               )}
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 py-3 text-sm font-bold text-white shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <UserPlus className="h-5 w-5" />
-                )}
-                <span>Create Account</span>
-              </button>
-            </div>
+            </button>
           </form>
 
-          <p className="mt-8 text-center text-xs font-medium text-zinc-500">
-            Already have an account?{' '}
+          {/* Prompt redirecting sign in */}
+          <div className="text-center pt-2 text-xs">
+            <span className="text-zinc-500">Already have an account? </span>
             <Link
-              href="/login"
-              className="font-bold text-emerald-600 hover:text-emerald-500 transition-colors"
+              href={`/login?redirect=${encodeURIComponent(redirect)}`}
+              className="text-violet-400 hover:underline font-semibold"
             >
-              Sign in instead
+              Sign in
             </Link>
-          </p>
+          </div>
+        </div>
+
+        {/* Back Link */}
+        <div className="text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-wider"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to Home
+          </Link>
         </div>
       </div>
     </div>

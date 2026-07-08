@@ -1,8 +1,9 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AppProvider } from "../context/AppContext";
+import { AuthProvider } from "../context/AuthContext";
+import { CartProvider } from "../context/CartContext";
 import Navbar from "../components/Navbar";
-import Toast from "../components/Toast";
+import Footer from "../components/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,15 +16,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "MedStore - Online Pharmacy & Medicines",
-  description: "Browse, search, and order your medicines seamlessly.",
+  title: "MedKart - Premium E-Commerce Medical Supplies Shop",
+  description: "A professional e-commerce platform for diagnostic tools, monitoring devices, and clinical supplies. Built with Next.js and integrated with Spring Boot.",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
       <body className="min-h-full flex flex-col bg-zinc-50 text-zinc-900 transition-colors">
         <AppProvider>
