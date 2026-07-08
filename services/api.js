@@ -220,7 +220,7 @@ const recalculateMockCart = () => {
 // ==========================================
 async function request(url, options = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  
+
   const headers = {
     'Content-Type': 'application/json',
     ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -234,7 +234,7 @@ async function request(url, options = {}) {
 
   try {
     const response = await fetch(url, config);
-    
+
     if (response.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
@@ -245,7 +245,7 @@ async function request(url, options = {}) {
     }
 
     const data = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(data.message || 'Something went wrong with the API request.');
     }
@@ -267,7 +267,7 @@ export const api = {
       await delay(MOCK_DELAY);
       // Mock validation
       if (!email || !password) throw new Error('Email and password are required');
-      
+
       // Let any user login, mock a return profile
       mockUser = {
         id: 'usr-12',
@@ -275,7 +275,7 @@ export const api = {
         email: email,
         role: 'CUSTOMER'
       };
-      
+
       const token = 'mock-jwt-token-xyz-12345';
       if (typeof window !== 'undefined') {
         localStorage.setItem('token', token);
@@ -294,14 +294,14 @@ export const api = {
     if (USE_MOCK_API) {
       await delay(MOCK_DELAY);
       if (!name || !email || !password) throw new Error('All fields are required');
-      
+
       mockUser = {
         id: 'usr-' + Math.floor(Math.random() * 1000),
         name,
         email,
         role: 'CUSTOMER'
       };
-      
+
       const token = 'mock-jwt-token-xyz-register';
       if (typeof window !== 'undefined') {
         localStorage.setItem('token', token);
@@ -327,12 +327,39 @@ export const api = {
   },
 
   // --- PRODUCT SERVICES ---
-  getProducts: async () => {
+  getProducts: async (search = '', category = 'All', sort = 'DEFAULT', page = 0, size = 6) => {
     if (USE_MOCK_API) {
       await delay(MOCK_DELAY);
-      return MOCK_PRODUCTS;
+      let result = [...MOCK_PRODUCTS];
+      if (search.trim() !== '') {
+        const query = search.toLowerCase();
+        result = result.filter(p => p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query));
+      }
+      if (category !== 'All') {
+        result = result.filter(p => p.category === category);
+      }
+      if (sort === 'PRICE_LOW_HIGH') result.sort((a, b) => a.price - b.price);
+      else if (sort === 'PRICE_HIGH_LOW') result.sort((a, b) => b.price - a.price);
+      
+      const start = page * size;
+      const end = start + size;
+      const content = result.slice(start, end);
+      return {
+        content,
+        totalPages: Math.ceil(result.length / size),
+        totalElements: result.length
+      };
     } else {
-      return request(ENDPOINTS.PRODUCTS);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (sort) params.append('sort', sort);
+      params.append('page', page);
+      params.append('size', size);
+      const data = await request(`${ENDPOINTS.PRODUCTS}?${params.toString()}`);
+      return {
+        ...data,
+        content: (data?.content || []).map(mapProductResponse)
+      };
     }
   },
 
@@ -433,7 +460,7 @@ export const api = {
   placeOrder: async (shippingAddress, paymentMethod) => {
     if (USE_MOCK_API) {
       await delay(MOCK_DELAY + 400);
-      
+
       if (mockCart.items.length === 0) {
         throw new Error('Cannot place order with an empty cart');
       }
@@ -456,7 +483,7 @@ export const api = {
 
       mockOrders.unshift(newOrder);
       mockCart = { items: [], totalPrice: 0 }; // clear cart upon ordering
-      
+
       return newOrder;
     } else {
       return request(ENDPOINTS.PLACE_ORDER, {

@@ -14,21 +14,29 @@ export default function ProductsPage({ searchParams }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // States for search and filter controls
+  // States for search, filter, and pagination controls
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [sortOption, setSortOption] = useState('DEFAULT');
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   const categories = ['All', 'Diagnostic Tools', 'Monitoring Devices', 'Emergency Supplies', 'Wellness & Comfort'];
 
-  // Fetch all products on mount
+  // Reset page index when search or sort properties alter
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, selectedCategory, sortOption]);
+
+  // Fetch products on mounting or filter/page updates
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       setError('');
       try {
-        const data = await api.getProducts();
-        setProducts(data);
+        const data = await api.getProducts(searchQuery, selectedCategory, sortOption, page, 6);
+        setProducts(data?.content || []);
+        setTotalPages(data?.totalPages || 1);
       } catch (err) {
         console.error(err);
         setError('Failed to load products. Please check if backend is running or API toggle is correct.');
@@ -37,41 +45,22 @@ export default function ProductsPage({ searchParams }) {
       }
     };
     fetchProducts();
-  }, []);
+  }, [searchQuery, selectedCategory, sortOption, page]);
 
-  // Filter and sort items dynamically during render (using useMemo for performance)
+  // Handle local category filter
   const filteredProducts = React.useMemo(() => {
     let result = [...products];
-
-    // Search filter
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (p) => p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query)
-      );
-    }
-
-    // Category filter
     if (selectedCategory !== 'All') {
       result = result.filter((p) => p.category === selectedCategory);
     }
-
-    // Sorting
-    if (sortOption === 'PRICE_LOW_HIGH') {
-      result.sort((a, b) => a.price - b.price);
-    } else if (sortOption === 'PRICE_HIGH_LOW') {
-      result.sort((a, b) => b.price - a.price);
-    } else if (sortOption === 'RATING') {
-      result.sort((a, b) => b.rating - a.rating);
-    }
-
     return result;
-  }, [products, searchQuery, selectedCategory, sortOption]);
+  }, [products, selectedCategory]);
 
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('All');
     setSortOption('DEFAULT');
+    setPage(0);
   };
 
   return (
@@ -123,7 +112,6 @@ export default function ProductsPage({ searchParams }) {
               <option value="DEFAULT" className="bg-zinc-950 text-white">Default Sorting</option>
               <option value="PRICE_LOW_HIGH" className="bg-zinc-950 text-white">Price: Low to High</option>
               <option value="PRICE_HIGH_LOW" className="bg-zinc-950 text-white">Price: High to Low</option>
-              <option value="RATING" className="bg-zinc-950 text-white">Top Customer Rating</option>
             </select>
           </div>
         </div>
@@ -162,6 +150,29 @@ export default function ProductsPage({ searchParams }) {
               <ProductCard product={product} />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && !error && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 py-8 border-t border-zinc-900 mt-12">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="px-4 py-2 text-xs font-semibold rounded-xl bg-zinc-900 border border-zinc-800 text-white disabled:opacity-50 hover:bg-zinc-800 transition-colors"
+          >
+            Previous
+          </button>
+          <span className="text-xs text-zinc-400">
+            Page {page + 1} of {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="px-4 py-2 text-xs font-semibold rounded-xl bg-zinc-900 border border-zinc-800 text-white disabled:opacity-50 hover:bg-zinc-800 transition-colors"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>
